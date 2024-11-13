@@ -1,6 +1,7 @@
 import sys
-from typing import cast
+from argparse import ArgumentParser
 from re import sub
+from typing import cast
 
 from cv2 import (
     COLOR_RGB2GRAY,
@@ -9,6 +10,7 @@ from cv2 import (
     cvtColor,
     threshold,
 )
+from docx import Document
 from numpy import array, ndarray
 from PIL import Image
 from pytesseract import image_to_string
@@ -155,12 +157,13 @@ def recognize_text(
     return generate_text(model, extract_text(image_path), 200, device)
 
 
-def main(argv: list[str]) -> None:
-    if len(argv) < 2:
-        print("Usage: python __main__.py <image_path>")
-        return
+def main() -> None:
+    parser = ArgumentParser()
+    parser.add_argument("path")
+    parser.add_argument("--output", "-o", action="store")
+    args = parser.parse_args()
 
-    image_path = argv[1]
+    image_path = cast(str, args.path)
     device = Device("cuda" if is_available() else "cpu")
 
     model = cast(
@@ -170,8 +173,18 @@ def main(argv: list[str]) -> None:
 
     recognized_text = recognize_text(model, image_path, device)
     recognized_text = sub(r"[^\x32-\x7F\s]", "", recognized_text)
-    print(f"Recognized Text: '\x1b[1;31m{recognized_text}\x1b[0m'")
+
+    match args.output:
+        case "docx":
+            doc = Document()
+            doc.add_paragraph(recognized_text)
+            doc.save("output.docx")
+        case "txt":
+            with open("output.txt", "a") as f:
+                f.write(recognized_text)
+        case _:
+            print(recognized_text)
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main()
